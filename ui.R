@@ -21,12 +21,14 @@ library(shiny)
 # Writing dashboard body
   body <- dashboardBody(
     fluidRow(
-      box(title = "類別-成本柱狀圖",plotlyOutput("bycategory")),
-      box(title = "地區-成本柱狀圖",plotlyOutput("byregion"))
+      box(title = "類別-庫存成本柱狀圖",plotlyOutput("bycategory"),
+          status = "primary"),
+      box(title = "庫存產品柱狀圖",plotlyOutput("byregion"))
     ),
     fluidRow(
-      box(title = "銷售成本柱狀圖",plotlyOutput("byboth")),
-      box(title = "產品個數柱狀圖",plotlyOutput("byN"))
+      box(title = "銷售成本柱狀圖",plotlyOutput("byboth"),footer = "以地區與
+          類別分類的銷售成本圖"),
+      box(title = "銷售產品個數柱狀圖",plotlyOutput("byN"))
   )
     )
   
