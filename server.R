@@ -20,137 +20,199 @@ shinyServer(function(input, output) {
   options(shiny.maxRequestSize=30*1024^2)
   
   
-  drawerfile <- reactive({
+  sales_plot_filefile <- reactive({
     
     # check if the file input is null
-    if(is.null(input$file1)|is.null(input$file2)) { return(NULL) }
+    if(is.null(input$stock_file_path) | is.null(input$sales_file_path)) {
+      return(NULL)
+      }
     
     # input file
-    tmpfile1 <- fread(input$file1$datapath)
-    tmpfile2 <- fread(input$file2$datapath)
+    stock_file <- fread(input$stock_file_path$datapath)
+    sales_file <- fread(input$sales_file_path$datapath)
     
     # Manipulating stocking file
-    tmpfile1 <- tmpfile1[!is.na(價格)]
-    tmpfile1 <- tmpfile1[選項 ==""]
-    tmpfile1[is.na(成本價),成本價 := 價格 * 0.33]
-    tmpfile1[,商品名稱 := str_replace_all
-             (商品名稱,"(\\[.*?\\])|\\【.*?\\】","") %>% trimws ]
+    stock_file <- stock_file[!is.na(價格)]
+    stock_file <- stock_file[選項 == ""]
+    stock_file[is.na(成本價), 成本價 := 價格 * 0.33]
+    stock_file %>%
+      `[`(j = 商品名稱 :=
+            str_replace_all(商品名稱,"(\\[.*?\\])|\\【.*?\\】","") %>%
+            trimws )
     
     # Manipulating sales file
-    tmpfile2 <- tmpfile2[,!duplicated(colnames(tmpfile2)),with = FALSE]
-    tmpfile2[,`:=`(訂單狀態 = first(訂單狀態),送貨狀態 = first(送貨狀態))
-             ,by = .(訂單號碼)]
-    tmpfile2 <- tmpfile2[!(訂單狀態 == "已取消"|送貨狀態 == "已退貨"
-                |送貨狀態 == "退貨中")]
-    saledata <- tmpfile2 %>% group_by(商品名稱) %>% 
-      summarise(sales = sum(數量)) %>% setDT
-    saledata[,商品名稱 := str_replace_all
-               (商品名稱,"(\\[.*?\\])|\\【.*?\\】","") %>% trimws ]
+    sales_file <- sales_file %>%
+      `[`(j = !duplicated(colnames(sales_file)), with = FALSE)
+    sales_file %>%
+      `[`(j = `:=`(訂單狀態 = first(訂單狀態),
+                   送貨狀態 = first(送貨狀態)) ,by = .(訂單號碼))
+    sales_file <- sales_file[!(訂單狀態 == "已取消" |
+                               送貨狀態 == "已退貨" |
+                               送貨狀態 == "退貨中")]
+    saledata <- sales_file %>%
+      group_by(商品名稱) %>% 
+      summarise(sales = sum(數量)) %>%
+      setDT
+    saledata %>%
+      `[`(j = 商品名稱 :=
+            str_replace_all(商品名稱,"(\\[.*?\\])|\\【.*?\\】","") %>%
+            trimws)
     
     # Merge two file
-    finaldata <- merge(saledata,tmpfile1,by = "商品名稱")
+    final_data <- merge(saledata, stock_file, by = "商品名稱")
     
     # Classificaion
-    finaldata[grepl("戒指|對戒|戒組|尾戒|關節戒|連指戒|情侶戒|三件戒|開口戒",finaldata$商品名稱),"category"]<-"戒指"
-    finaldata[grepl("耳環|耳針|耳扣|耳夾",finaldata$商品名稱),"category"]<-"耳環"
-    finaldata[grepl("項鍊|鎖骨鍊|頸鍊|頸圈",finaldata$商品名稱),"category"]<-"項鍊"
-    finaldata[grepl("手鍊|手環|手鐲",finaldata$商品名稱),"category"]<-"手鍊"
-    finaldata[grepl("髮飾|髮帶|髮圈|髮夾|髮箍",finaldata$商品名稱),"category"]<-"髮飾"
-    finaldata[grepl("手錶",finaldata$商品名稱),"category"]<-"手錶"
-    finaldata[grepl("刺青貼紙",finaldata$商品名稱),"category"]<-"刺青貼紙"
-    finaldata[grepl("墨鏡",finaldata$商品名稱),"category"]<-"墨鏡"
-    finaldata[grepl("腳鍊",finaldata$商品名稱),"category"]<-"腳鍊"
-    finaldata[is.na(finaldata$category),"category"]<-"其它"
-    finaldata[,category := as.factor(category)]
+    final_data %>%
+      `[`(grepl("戒指 | 對戒 | 戒組 | 尾戒 | 關節戒 | 連指戒 | 情侶戒 |
+                三件戒 | 開口戒", 商品名稱), category := "戒指")
+    final_data %>%
+      `[`(grepl("耳環 | 耳針 | 耳扣 | 耳夾", 商品名稱), category := "耳環")
+    final_data %>%
+      `[`(grepl("項鍊 | 鎖骨鍊 | 頸鍊 | 頸圈", 商品名稱), category := "項鍊")
+    final_data %>%
+      `[`(grepl("手鍊 | 手環 | 手鐲", 商品名稱), category := "手鍊")
+    final_data %>%
+      `[`(grepl("髮飾 | 髮帶 | 髮圈 | 髮夾 | 髮箍", 商品名稱),
+          category := "髮飾")
+    final_data[grepl("手錶", 商品名稱), category := "手錶"]
+    final_data[grepl("刺青貼紙", 商品名稱), category := "刺青貼紙"]
+    final_data[grepl("墨鏡", 商品名稱), category := "墨鏡"]
+    final_data[grepl("腳鍊", 商品名稱), category := "腳鍊"]
+    final_data[is.na(category), category := "其它"]
+    final_data[, category := as.factor(category)]
     
     # Assign manufacturer region
-    finaldata[,商店貨號 := sapply(商店貨號,function(k) 
-      {strsplit(k,"-")} %>% .[[1]] %>% .[1]) %>% as.character]
-    finaldata[substr(商店貨號,1,1) == "K" | 商店貨號 == "IHNS",region := "Korea"]
-    finaldata[is.na(region),region := "China"]
+    final_data %>%
+      `[`(j = 商店貨號 := sapply(商店貨號,function(k) 
+      {strsplit(k, "-")} %>%
+        .[[1]] %>%
+        .[1]) %>%
+        as.character)
+    final_data %>%
+      `[`(substr(商店貨號,1,1) == "K" | 商店貨號 == "IHNS",
+          region := "Korea")
     
     # Last Manipulating on calculating main feature
-    finaldata[,totalcost := sales * 成本價]
-    colnames(finaldata)[grep("庫存",colnames(finaldata))] <- "stock"
-    finaldata[,stockcost := stock * 成本價]
-    data.table(finaldata)
+    final_data[, totalcost := sales * 成本價]
+    colnames(final_data)[grep("庫存", colnames(final_data))] <- "stock"
+    final_data[, stockcost := stock * 成本價]
+    data.table(final_data)
     })
   
   # Creating reactive object for stock checking
-    stocker <- reactive({
+    stock_plot_file <- reactive({
   # Check the presence of input file
-    if(is.null(input$file1)) {return(NULL)}
+    if(is.null(input$stock_file_path)) {
+      return(NULL)
+      }
   
   # Input file
-    juicyfile <- fread(input$file1$datapath)
+    processed_stock_file <- fread(input$stock_file_path$datapath)
     
   # Manipulating stocking file
-    juicyfile <- juicyfile[!is.na(價格)]
-    juicyfile <- juicyfile[選項 ==""]
-    juicyfile[is.na(成本價),成本價 := 價格 * 0.33]
-    juicyfile <- juicyfile[選項 == ""]
-    juicyfile[,商品名稱 := str_replace_all
-             (商品名稱,"(\\[.*?\\])|\\【.*?\\】","") %>% trimws ]
+    processed_stock_file <- processed_stock_file[!is.na(價格)]
+    processed_stock_file <- processed_stock_file[選項 == ""]
+    processed_stock_file[is.na(成本價), 成本價 := 價格 * 0.33]
+    processed_stock_file <- processed_stock_file[選項 == ""]
+    processed_stock_file %>%
+      `[`(j = 商品名稱 := 
+            str_replace_all(商品名稱, "(\\[.*?\\])|\\【.*?\\】","") %>%
+            trimws)
     
   # Classification
-    juicyfile[grepl("戒指|對戒|戒組|尾戒|關節戒|連指戒|情侶戒|三件戒|開口戒",juicyfile$商品名稱),"category"]<-"戒指"
-    juicyfile[grepl("耳環|耳針|耳扣|耳夾",juicyfile$商品名稱),"category"]<-"耳環"
-    juicyfile[grepl("項鍊|鎖骨鍊|頸鍊|頸圈",juicyfile$商品名稱),"category"]<-"項鍊"
-    juicyfile[grepl("手鍊|手環|手鐲",juicyfile$商品名稱),"category"]<-"手鍊"
-    juicyfile[grepl("髮飾|髮帶|髮圈|髮夾|髮箍",juicyfile$商品名稱),"category"]<-"髮飾"
-    juicyfile[grepl("手錶",juicyfile$商品名稱),"category"]<-"手錶"
-    juicyfile[grepl("刺青貼紙",juicyfile$商品名稱),"category"]<-"刺青貼紙"
-    juicyfile[grepl("墨鏡",juicyfile$商品名稱),"category"]<-"墨鏡"
-    juicyfile[grepl("腳鍊",juicyfile$商品名稱),"category"]<-"腳鍊"
-    juicyfile[is.na(juicyfile$category),"category"]<-"其它"
+    processed_stock_file %>%
+      `[`(grepl("戒指 | 對戒 | 戒組 | 尾戒 | 關節戒 | 連指戒 | 情侶戒 |
+                三件戒 | 開口戒", 商品名稱), category := "戒指")
+    processed_stock_file %>%
+      `[`(grepl("耳環 | 耳針 | 耳扣 | 耳夾", 商品名稱), category := "耳環")
+    processed_stock_file %>%
+      `[`(grepl("項鍊 | 鎖骨鍊 | 頸鍊 | 頸圈", 商品名稱), category := "項鍊")
+    processed_stock_file %>%
+      `[`(grepl("手鍊 | 手環 | 手鐲", 商品名稱), category := "手鍊")
+    processed_stock_file %>%
+      `[`(grepl("髮飾 | 髮帶 | 髮圈 | 髮夾 | 髮箍", 商品名稱),
+          category := "髮飾")
+    processed_stock_file[grepl("手錶", 商品名稱), category := "手錶"]
+    processed_stock_file[grepl("刺青貼紙", 商品名稱), category := "刺青貼紙"]
+    processed_stock_file[grepl("墨鏡", 商品名稱), category := "墨鏡"]
+    processed_stock_file[grepl("腳鍊", 商品名稱), category := "腳鍊"]
+    processed_stock_file[is.na(category), category := "其它"]
+    processed_stock_file[, category := as.factor(category)]
     
   # Assigning Region
-    juicyfile[,商店貨號 := sapply(商店貨號,function(k) 
-      {strsplit(k,"-")} %>% .[[1]] %>% .[1]) %>% as.character]
-    juicyfile[substr(商店貨號,1,1) == "K" | 商店貨號 == "IHNS",region := "Korea"]
-    juicyfile[is.na(region),region := "China"]
+    processed_stock_file %>%
+      `[`(j = 商店貨號 := sapply(商店貨號,function(k) 
+      {strsplit(k, "-")} %>%
+        .[[1]] %>%
+        .[1]) %>%
+        as.character)
+    processed_stock_file %>%
+      `[`(substr(商店貨號, 1, 1) == "K" | 商店貨號 == "IHNS", region := "Korea")
   
   # Calculating main feature
-    colnames(juicyfile)[grep("庫存",colnames(juicyfile))] <- "stock"
-    juicyfile[,stockcost := stock * 成本價]
-    juicyfile <- juicyfile[!stock == 0]
+    stock_in_name <- grep("庫存", colnames(processed_stock_file))
+    colnames(processed_stock_file)[stock_in_name] <- "stock"
+    processed_stock_file[, stockcost := stock * 成本價]
+    processed_stock_file <- processed_stock_file[!stock == 0]
     })
   
      # Ploting first panel
-    output$bycategory <- renderPlotly({
-      if (is.null(stocker())) {return(NULL)}
-    kkbox  <- stocker() %>% group_by(category,region) %>% summarise(stockcost = sum(stockcost)) %>%
-      ggplot(aes(category,stockcost,fill = region)) + geom_bar(stat = "identity",position = "dodge") +
-        geom_text(aes(label = stockcost),position = position_dodge(width = 1)) + theme_bw()
-    ggplotly(kkbox)
+    output$stock_by_category <- renderPlotly({
+      if (is.null(stock_plot_file())) {
+        return(NULL)
+        }
+    stock_by_category_canvas  <- stock_plot_file() %>%
+      group_by(category, region) %>%
+      summarise(stockcost = sum(stockcost)) %>%
+      ggplot(aes(category, stockcost, fill = region)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_text(aes(label = stockcost), position = position_dodge(width = 1)) +
+      theme_bw()
+      ggplotly(stock_by_category_canvas)
     })
     
      # Ploting second panel
-    output$byregion <- renderPlotly({
-      if (is.null(stocker())) {return(NULL)}
-    applemusic <- stocker() %>% group_by(category,region) %>% summarise(num = n() ) %>%
-      ggplot(aes(category,num,fill = region)) + geom_bar(stat = "identity",position = "dodge") +
-      geom_text(aes(label = num),position = position_dodge(width = 1)) + theme_bw()
-    ggplotly(applemusic)
+    output$stock_by_region <- renderPlotly({
+      if (is.null(stock_plot_file())) {
+        return(NULL)
+        }
+    stock_by_region_canvas <- stock_plot_file() %>%
+      group_by(category, region) %>%
+      summarise(num = n()) %>%
+      ggplot(aes(category, num, fill = region)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_text(aes(label = num), position = position_dodge(width = 1)) +
+      theme_bw()
+      ggplotly(stock_by_region_canvas)
     })
     
     # Ploting third panel
-    output$byboth <- renderPlotly({
-      if (is.null(drawerfile())) {return(NULL)}
-    spotify <- drawerfile() %>% group_by(category,region) %>% 
-      summarise(totalcost = sum(totalcost)) %>% ggplot(aes(category,totalcost,fill = region)) +
-        geom_bar(stat = "identity",position = "dodge") + geom_text(aes(label = totalcost),position = position_dodge(width = 1)) + 
-          theme_bw()
-    ggplotly(spotify)
+    output$cost_by_region_category <- renderPlotly({
+      if (is.null(sales_plot_filefile())) {
+        return(NULL)
+        }
+    cost_plot_canvas <- sales_plot_filefile() %>%
+      group_by(category,region) %>% 
+      summarise(totalcost = sum(totalcost)) %>%
+      ggplot(aes(category, totalcost, fill = region)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_text(aes(label = totalcost), position = position_dodge(width = 1)) + 
+      theme_bw()
+      ggplotly(cost_plot_canvas)
     })
     
     # Ploting fourth panel
-    output$byN <- renderPlotly({
-      if (is.null(drawerfile())) {return(NULL)}
-      googlemusic <- drawerfile() %>% group_by(category,region) %>% summarise(num = n()) %>%
-        ggplot(aes(category,num,fill = region)) + geom_bar(stat = "identity",position = "dodge") +
-          geom_text(aes(label = num),position = position_dodge(width = 1)) +
-            theme_bw()
-    ggplotly(googlemusic)
+    output$sales_by_region_category <- renderPlotly({
+      if (is.null(sales_plot_filefile())) {
+        return(NULL)
+        }
+      sales_plot_canvas <- sales_plot_filefile() %>%
+        group_by(category, region) %>%
+        summarise(num = n()) %>%
+        ggplot(aes(category, num, fill = region)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        geom_text(aes(label = num), position = position_dodge(width = 1)) +
+        theme_bw()
+        ggplotly(sales_plot_canvas)
     })
 })
